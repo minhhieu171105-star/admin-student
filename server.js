@@ -7,8 +7,8 @@ const { client, initializeDatabase } = require('./config/db');
 async function start() {
   await client.connect();
   await initializeDatabase();
-  app.listen(port, '127.0.0.1', () => {
-    console.log('Admin Node.js listening at http://127.0.0.1:' + port);
+  app.listen(port, '0.0.0.0', () => {
+    console.log('Admin Node.js listening on port ' + port);
   });
 }
 
