@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="/css/exam.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <span class="brand-icon-wrap" aria-hidden="true">🎓</span>
+      <div class="brand-info">
+        <div class="brand-name">Thi trực tuyến <span class="brand-sep">·</span> <span class="brand-link">Quản trị</span></div>
+        <div class="header-status">Hệ thống ổn định</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-avatar" id="adminAvatar" title="{{NAME}}">A</div>
+      <form method="post" action="/admin/action" style="margin:0;display:inline-flex;">
+        <input type="hidden" name="action" value="logout">
+        <button type="submit" class="logout-pill-btn" title="Đăng xuất">
+          <span class="logout-icon">⎋</span>
+          <span class="logout-text">Đăng xuất</span>
+        </button>
+      </form>
+    </div>
+  </header>
+  <main>{{BODY}}</main>
+  <script>
+    (function() {
+      const el = document.getElementById('adminAvatar');
+      if (!el) return;
+      const name = (el.getAttribute('title') || '').trim();
+      const parts = name.split(/\s+/).filter(Boolean);
+      el.textContent = parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : (name[0] || 'A').toUpperCase();
+    })();
+  </script>
+</body>
+</html>
