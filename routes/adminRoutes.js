@@ -48,6 +48,12 @@ app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h', etag: true }));
 app.use(session({ name: 'ADMINSESSID', secret: process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex'), resave: false, saveUninitialized: false, rolling: true, unset: 'destroy', store: MongoStore.create({ mongoUrl: uri, dbName, collectionName: 'admin_sessions' }), cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.APP_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
 
 function dateValue(v) {
   if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
@@ -184,7 +190,10 @@ app.post('/admin/progress', requireAdmin, async (req, res, next) => {
 app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
   const c = db(), b = req.body, go = (message, error = false, view = b.view || 'accounts') => res.redirect(`/admin?view=${encodeURIComponent(view)}&${error ? 'error' : 'message'}=${encodeURIComponent(message)}`);
   try {
-    if (b.action === 'logout') return req.session.destroy(() => res.redirect('/'));
+    if (b.action === 'logout') return req.session.destroy(() => {
+      res.clearCookie('ADMINSESSID');
+      res.redirect('/');
+    });
     if (b.action === 'student_manual' || b.action === 'students') {
       let rows = [];
       const assignedTestId = String(b.test_id || '').trim();
