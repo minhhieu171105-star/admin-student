@@ -224,22 +224,31 @@ app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
     if (b.action === 'assign_subject') {
       const { ObjectId } = require('mongodb');
       const testId = String(b.test_id || '').trim();
-      const studentUsername = String(b.student_username || '').trim();
+      const selectedUsernames = (Array.isArray(b.student_username) ? b.student_username : [b.student_username])
+        .map(value => String(value || '').trim()).filter(Boolean);
       if (!testId) return go('Hãy chọn môn thi cần gán.', true, 'accounts');
       const filter = testId === 'all'
         ? { ends_at: { $gt: Math.floor(Date.now() / 1000) } }
         : { _id: ObjectId.isValid(testId) ? new ObjectId(testId) : testId };
-      if (studentUsername === '__ALL__') {
+      if (selectedUsernames.includes('__ALL__')) {
         const allUsernames = await c.collection('students').distinct('username', { deleted_at: { $exists: false } });
         await c.collection('tests').updateMany(filter, { $addToSet: { student_usernames: { $each: allUsernames } } });
         return go(`Đã gán TẤT CẢ ${allUsernames.length} học sinh vào môn thi được chọn.`, false, 'accounts');
-      } else {
-        await c.collection('tests').updateMany(filter, { $addToSet: { student_usernames: studentUsername } });
-        return go(`Đã gán học sinh ${studentUsername} vào môn thi.`, false, 'accounts');
       }
+      if (!selectedUsernames.length) return go('Hãy chọn ít nhất một học sinh.', true, 'accounts');
+      await c.collection('tests').updateMany(filter, { $addToSet: { student_usernames: { $each: selectedUsernames } } });
+      if (b.return_test_id) return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', test_id: String(b.return_test_id), message: `Đã thêm ${selectedUsernames.length} học sinh vào môn.` }).toString()}`);
+      return go(`Đã gán ${selectedUsernames.length} học sinh vào môn thi.`, false, 'accounts');
     }
     if (b.action === 'student_trash') { await c.collection('students').updateOne({ username: b.username, deleted_at: { $exists: false } }, { $set: { deleted_at: Math.floor(Date.now()/1000) } }); return go('Đã chuyển tài khoản vào thùng rác.'); }
     if (b.action === 'student_restore') { await c.collection('students').updateOne({ username: b.username }, { $unset: { deleted_at: '' } }); await c.collection('tests').updateMany({ ends_at: { $gt: Math.floor(Date.now()/1000) } }, { $addToSet: { student_usernames: b.username } }); return go('Đã khôi phục tài khoản.', false, 'trash'); }
+    if (b.action === 'subject_students_remove_all') {
+      const { ObjectId } = require('mongodb'), testId = String(b.test_id || '');
+      if (!ObjectId.isValid(testId)) return go('Mã môn thi không hợp lệ.', true, 'accounts');
+      await c.collection('tests').updateOne({ _id: new ObjectId(testId) }, { $set: { student_usernames: [] } });
+      const result = await c.collection('attempts').deleteMany({ test_id: testId });
+      return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', test_id: testId, message: `Đã xóa toàn bộ học sinh khỏi môn và ${result.deletedCount} lượt làm liên quan.` }).toString()}`);
+    }
     if (b.action === 'subject_student_remove') {
       const { ObjectId } = require('mongodb'), testId = String(b.test_id || ''), username = String(b.username || '');
       if (!ObjectId.isValid(testId) || !username) return go('Thiếu thông tin học sinh hoặc môn thi.', true, 'accounts');

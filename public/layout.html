@@ -41,6 +41,39 @@
         ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
         : (name[0] || 'A').toUpperCase();
     })();
+
+    function runInlineScripts(container) {
+      container.querySelectorAll('script').forEach(oldScript => {
+        const script = document.createElement('script');
+        script.textContent = oldScript.textContent;
+        oldScript.replaceWith(script);
+      });
+    }
+
+    document.addEventListener('submit', async function(event) {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post' || form.action !== location.origin + '/admin/action') return;
+      if (form.querySelector('[name="action"]')?.value === 'logout') return;
+
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"], button:not([type])');
+      if (button?.disabled) return;
+      if (button) button.disabled = true;
+
+      try {
+        const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Không thể hoàn thành thao tác.');
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const nextMain = page.querySelector('main');
+        if (!nextMain) throw new Error('Không thể cập nhật nội dung trang.');
+        document.querySelector('main').innerHTML = nextMain.innerHTML;
+        history.replaceState({}, '', new URL(response.url).pathname + new URL(response.url).search);
+        runInlineScripts(document.querySelector('main'));
+      } catch (error) {
+        alert(error.message || 'Không thể hoàn thành thao tác. Hãy thử lại.');
+        if (button) button.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
