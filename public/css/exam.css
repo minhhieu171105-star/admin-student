@@ -1048,3 +1048,70 @@ article p { margin: 6px 0 0; font-size: 14px; }
 }
 
 .choice button strong { display: inline; margin-right: .3rem; }
+
+/* ─── Horizontal Scroll Track & Vocab Slider ──────────── */
+.horizontal-scroll-track {
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 6px 4px 16px;
+  margin-bottom: 24px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-light) transparent;
+}
+.horizontal-scroll-track::-webkit-scrollbar {
+  height: 8px;
+}
+.horizontal-scroll-track::-webkit-scrollbar-track {
+  background: var(--line-light);
+  border-radius: 999px;
+}
+.horizontal-scroll-track::-webkit-scrollbar-thumb {
+  background: var(--primary-muted);
+  border-radius: 999px;
+}
+.horizontal-scroll-track::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.vocab-slider-card {
+  flex: 0 0 290px;
+  max-width: 320px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.vocab-slider-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
+}
+
+.vocab-badge-lang {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+}
+.vocab-badge-level {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+}

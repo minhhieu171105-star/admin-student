@@ -14,7 +14,7 @@ const app = express();
 const port = Number(process.env.PORT || 8002);
 const dbName = databaseName;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
-const uploads = upload.fields([{ name: 'sheet', maxCount: 1 }, { name: 'students_sheet', maxCount: 1 }]);
+const uploads = upload.fields([{ name: 'sheet', maxCount: 1 }, { name: 'students_sheet', maxCount: 1 }, { name: 'vocab_sheet', maxCount: 1 }]);
 
 function securityHeaders(req, res, next) {
   res.set({
@@ -59,7 +59,16 @@ function dateValue(v) {
   if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
   const s = String(v || '').trim();
   if (/^\d{8}$/.test(s)) return `${s.slice(4)}-${s.slice(2,4)}-${s.slice(0,2)}`;
-  const d = new Date(s); return Number.isNaN(+d) ? '' : d.toISOString().slice(0,10);
+  const parts = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (parts) {
+    const [, day, month, year] = parts;
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    return date.getUTCFullYear() === Number(year) && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day)
+      ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      : '';
+  }
+  const d = new Date(s);
+  return Number.isNaN(+d) ? '' : d.toISOString().slice(0, 10);
 }
 function excelText(value) {
   if (value == null) return '';
@@ -147,6 +156,54 @@ async function readExamRows(buffer) {
   }
   return rows;
 }
+async function readVocabRows(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch (error) {
+    throw excelLoadError(buffer, 'Tệp từ vựng', error);
+  }
+  const sheet = workbook.worksheets[0];
+  if (!sheet) throw new Error('Tệp Excel không có trang tính nào.');
+  const rows = [];
+  // Cột A: STT, B: Từ vựng, C: Phiên âm, D: Tiếng Việt (Nghĩa)
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+    const row = sheet.getRow(rowNumber);
+    rows.push({ rowNumber, values: Array.from({ length: 4 }, (_, index) => row.getCell(index + 1).value) });
+  }
+  return rows;
+}
+function parseVocabRows(rows) {
+  const words = [], invalidRows = [];
+  for (const { rowNumber, values } of rows) {
+    const stt = excelText(values[0]);
+    const word = excelText(values[1]);
+    const phonetic = excelText(values[2]);
+    const meaning = excelText(values[3]);
+
+    if (!stt && !word && !meaning) continue;
+
+    const problems = [];
+    if (!word) problems.push('thiếu từ vựng ở cột B');
+    if (!meaning) problems.push('thiếu nghĩa tiếng Việt ở cột D');
+
+    if (problems.length) {
+      invalidRows.push(`dòng ${rowNumber}: ${problems.join(', ')}`);
+      continue;
+    }
+
+    words.push({
+      stt: stt || String(words.length + 1),
+      word,
+      phonetic: phonetic || '',
+      meaning
+    });
+  }
+  if (invalidRows.length) {
+    throw new Error(`File từ vựng có ${invalidRows.length} dòng không hợp lệ: ${invalidRows.slice(0, 3).join('; ')}${invalidRows.length > 3 ? '…' : ''}`);
+  }
+  return words;
+}
 app.get('/', async (req, res, next) => {
   if (req.session.role === 'admin') return res.redirect('/admin');
   res.send(loginPage());
@@ -174,7 +231,20 @@ app.get('/admin', requireAdmin, async (req, res, next) => {
     }).filter(Boolean));
     if (req.body?.progress_refresh) return res.json({ rows: progress });
     const active = students.filter(s => s.deleted_at == null), trash = students.filter(s => s.deleted_at != null);
-    res.send(renderAdmin({ name: req.session.name, students: active, trash, tests, progress, view: req.query.view || 'accounts', selectedTestId: String(req.query.test_id || ''), message: req.query.message || '', error: req.query.error || '' }));
+    const vocabSets = await db().collection('vocab_sets').find({}).sort({ created_at: -1 }).toArray();
+    res.send(renderAdmin({
+      name: req.session.name,
+      students: active,
+      trash,
+      tests,
+      progress,
+      vocabSets,
+      selectedVocabId: String(req.query.vocab_id || ''),
+      view: req.query.view || 'accounts',
+      selectedTestId: String(req.query.test_id || ''),
+      message: req.query.message || '',
+      error: req.query.error || ''
+    }));
   } catch (e) { next(e); }
 });
 app.post('/admin/progress', requireAdmin, async (req, res, next) => {
@@ -279,7 +349,22 @@ app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
     if (b.action === 'test') {
       const questionFile = req.files?.sheet?.[0], studentsFile = req.files?.students_sheet?.[0];
       const starts = Math.floor(new Date(b.starts).getTime()/1000), noDeadline = b.no_deadline === '1', enteredEnd = Math.floor(new Date(b.ends).getTime()/1000), ends = noDeadline ? 253402300799 : enteredEnd, duration = Number(b.minutes), qps = Number(b.questions_per_student), max = Number(b.max_attempts);
-      if (!b.title?.trim() || !Number.isFinite(starts) || (!noDeadline && (!Number.isFinite(ends) || ends <= starts)) || !Number.isInteger(duration) || duration < 1 || !Number.isInteger(qps) || qps < 1 || !Number.isInteger(max) || max < 0 || !questionFile) return go('Kiểm tra tên, thời gian, số phút, số câu, lượt làm và file đề thi.', true, 'exams');
+      const submissionKey = String(b.submission_key || '').trim();
+      if (!b.title?.trim()) return go('Hãy nhập Môn thi / Tên kỳ thi.', true, 'exams');
+      if (!Number.isFinite(starts)) return go('Hãy chọn thời gian bắt đầu hợp lệ.', true, 'exams');
+      if (!noDeadline && !Number.isFinite(ends)) return go('Hãy chọn thời gian kết thúc hoặc chọn Không giới hạn hạn nộp.', true, 'exams');
+      if (!noDeadline && ends <= starts) return go('Thời gian kết thúc phải sau thời gian bắt đầu.', true, 'exams');
+      if (!Number.isInteger(duration) || duration < 1) return go('Thời lượng làm bài phải là số nguyên từ 1 phút trở lên.', true, 'exams');
+      if (!Number.isInteger(qps) || qps < 1) return go('Số câu mỗi học sinh phải là số nguyên từ 1 câu trở lên.', true, 'exams');
+      if (!Number.isInteger(max) || max < 0) return go('Số lượt làm phải là số nguyên từ 0 trở lên; 0 là không giới hạn.', true, 'exams');
+      if (!questionFile) return go('Hãy chọn tệp đề thi Excel .xlsx.', true, 'exams');
+      if (!submissionKey) return go('Phiên giao đề đã hết hạn. Hãy tải lại trang và thử lại.', true, 'exams');
+      try {
+        await c.collection('test_creation_locks').insertOne({ _id: submissionKey, created_at: new Date() });
+      } catch (error) {
+        if (error?.code === 11000) return go('Yêu cầu giao đề này đang được xử lý. Hệ thống chỉ tạo một kỳ thi.', false, 'exams');
+        throw error;
+      }
       const questions = parseQuestionRows(await readExamRows(questionFile.buffer));
       if (!questions.length || qps > questions.length) return go(`File đề có ${questions.length} câu hợp lệ. Số câu mỗi học sinh (${qps}) không được vượt quá số câu trong đề.`, true, 'exams');
       const usernames = [];
@@ -314,6 +399,100 @@ app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
       return go(assignedUsernames.length
         ? `Đã tạo đề với ${questions.length} câu và gán cho ${assignedUsernames.length} học sinh.`
         : `Đã tạo đề với ${questions.length} câu. Bạn có thể thêm học sinh vào môn sau.`, false, 'exams');
+    }
+    if (b.action === 'vocab_create') {
+      const vocabFile = req.files?.vocab_sheet?.[0] || req.files?.sheet?.[0];
+      const studentsFile = req.files?.students_sheet?.[0];
+      const language = String(b.language || '').trim();
+      const level = String(b.level || '').trim();
+      const title = String(b.title || `${language}${level ? ` · ${level}` : ''}`).trim();
+      const submissionKey = String(b.submission_key || '').trim();
+      if (!language || !level) return go('Hãy nhập tên ngôn ngữ và cấp độ.', true, 'vocab');
+      if (!vocabFile) return go('Hãy chọn tệp Excel từ vựng (.xlsx). Cột A: STT, Cột B: Từ vựng, Cột C: Phiên âm, Cột D: Tiếng Việt.', true, 'vocab');
+      if (!submissionKey) return go('Phiên tạo bộ từ vựng đã hết hạn. Hãy tải lại trang và thử lại.', true, 'vocab');
+      try {
+        await c.collection('vocab_creation_locks').insertOne({ _id: submissionKey, created_at: new Date() });
+      } catch (error) {
+        if (error?.code === 11000) return go('Yêu cầu tạo bộ từ vựng này đang được xử lý. Hệ thống chỉ tạo một bộ.', false, 'vocab');
+        throw error;
+      }
+
+      const words = parseVocabRows(await readVocabRows(vocabFile.buffer));
+      if (!words.length) return go('Tệp từ vựng không có dữ liệu hợp lệ.', true, 'vocab');
+
+      const usernames = [];
+      if (studentsFile) {
+        const studentRows = await readExcelRows(studentsFile.buffer);
+        for (const row of studentRows) {
+          const { username, birth } = studentValues(row, true);
+          if (!username || !birth) continue;
+          await c.collection('students').updateOne({ username }, { $set: { username, full_name: username, birth_date: birth }, $unset: { deleted_at: '' } }, { upsert: true });
+          usernames.push(username);
+        }
+      }
+      const assignedUsernames = [...new Set(usernames)];
+
+      await c.collection('vocab_sets').insertOne({
+        title,
+        language,
+        level,
+        words,
+        total_words: words.length,
+        student_usernames: assignedUsernames,
+        created_at: Math.floor(Date.now() / 1000)
+      });
+      return go(`Đã tạo bộ từ vựng "${title}" (${words.length} từ) và gán cho ${assignedUsernames.length} học sinh.`, false, b.view || 'vocab');
+    }
+    if (b.action === 'vocab_delete') {
+      const { ObjectId } = require('mongodb'), id = String(b.vocab_id || '');
+      if (!ObjectId.isValid(id)) return go('Mã bộ từ vựng không hợp lệ.', true, b.view || 'vocab');
+      await c.collection('vocab_sets').deleteOne({ _id: new ObjectId(id) });
+      return go('Đã xóa bộ từ vựng thành công.', false, b.view || 'vocab');
+    }
+    if (b.action === 'vocab_assign') {
+      const { ObjectId } = require('mongodb'), id = String(b.vocab_id || '');
+      if (!ObjectId.isValid(id)) return go('Mã bộ từ vựng không hợp lệ.', true, 'accounts');
+      const selectedUsernames = (Array.isArray(b.student_username) ? b.student_username : [b.student_username])
+        .map(v => String(v || '').trim()).filter(Boolean);
+      if (selectedUsernames.includes('__ALL__')) {
+        const allUsernames = await c.collection('students').distinct('username', { deleted_at: { $exists: false } });
+        await c.collection('vocab_sets').updateOne({ _id: new ObjectId(id) }, { $addToSet: { student_usernames: { $each: allUsernames } } });
+        return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, message: `Đã gán tất cả ${allUsernames.length} học sinh vào bộ từ vựng.` }).toString()}`);
+      }
+      if (!selectedUsernames.length) return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, error: 'Hãy chọn ít nhất một học sinh.' }).toString()}`);
+      await c.collection('vocab_sets').updateOne({ _id: new ObjectId(id) }, { $addToSet: { student_usernames: { $each: selectedUsernames } } });
+      return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, message: `Đã thêm ${selectedUsernames.length} học sinh vào bộ từ vựng.` }).toString()}`);
+    }
+    if (b.action === 'vocab_student_remove') {
+      const { ObjectId } = require('mongodb'), id = String(b.vocab_id || ''), username = String(b.username || '');
+      if (!ObjectId.isValid(id) || !username) return go('Thiếu thông tin học sinh hoặc bộ từ vựng.', true, 'accounts');
+      await c.collection('vocab_sets').updateOne({ _id: new ObjectId(id) }, { $pull: { student_usernames: username } });
+      return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, message: 'Đã xóa học sinh khỏi bộ từ vựng.' }).toString()}`);
+    }
+    if (b.action === 'vocab_students_excel') {
+      const { ObjectId } = require('mongodb'), id = String(b.vocab_id || '');
+      if (!ObjectId.isValid(id)) return go('Mã bộ từ vựng không hợp lệ.', true, 'accounts');
+      const studentFile = req.files?.sheet?.[0] || req.files?.students_sheet?.[0];
+      if (!studentFile) return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, error: 'Hãy chọn file Excel danh sách học sinh.' }).toString()}`);
+      const studentRows = await readExcelRows(studentFile.buffer);
+      const usernames = [];
+      for (const row of studentRows) {
+        const { username, birth } = studentValues(row, true);
+        if (!username || !birth) continue;
+        await c.collection('students').updateOne({ username }, { $set: { username, full_name: username, birth_date: birth }, $unset: { deleted_at: '' } }, { upsert: true });
+        usernames.push(username);
+      }
+      await c.collection('vocab_sets').updateOne({ _id: new ObjectId(id) }, { $addToSet: { student_usernames: { $each: usernames } } });
+      return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, message: `Đã nhập và gán ${usernames.length} học sinh vào bộ từ vựng.` }).toString()}`);
+    }
+    if (b.action === 'vocab_student_manual') {
+      const { ObjectId } = require('mongodb'), id = String(b.vocab_id || '');
+      if (!ObjectId.isValid(id)) return go('Mã bộ từ vựng không hợp lệ.', true, 'accounts');
+      const username = String(b.full_name || '').trim(), birth = String(b.birth_date || '').trim();
+      if (!username || !birth) return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, error: 'Hãy nhập họ tên và ngày sinh.' }).toString()}`);
+      await c.collection('students').updateOne({ username }, { $set: { username, full_name: username, birth_date: birth }, $unset: { deleted_at: '' } }, { upsert: true });
+      await c.collection('vocab_sets').updateOne({ _id: new ObjectId(id) }, { $addToSet: { student_usernames: username } });
+      return res.redirect(`/admin?${new URLSearchParams({ view: 'accounts', vocab_id: id, message: `Đã thêm học sinh ${username} vào bộ từ vựng.` }).toString()}`);
     }
     return go('Thao tác không hợp lệ.', true);
   } catch (e) { console.error('Admin action failed:', e.message); return go(actionErrorMessage(e, b.view || 'accounts'), true, b.view || 'accounts'); }

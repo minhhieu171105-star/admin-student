@@ -10,6 +10,10 @@ async function initializeDatabase() {
   await db().collection('attempts').updateMany({ attempt_no: { $exists: false } }, { $set: { attempt_no: 1 } });
   try { await db().collection('attempts').dropIndex('test_id_1_student_username_1'); } catch (_) {}
   await db().collection('attempts').createIndex({ test_id: 1, student_username: 1, attempt_no: 1 }, { unique: true });
+  await db().collection('vocab_sets').createIndex({ created_at: -1 });
+  await db().collection('vocab_sets').createIndex({ student_usernames: 1 });
+  await db().collection('vocab_creation_locks').createIndex({ created_at: 1 }, { expireAfterSeconds: 86400 });
+  await db().collection('test_creation_locks').createIndex({ created_at: 1 }, { expireAfterSeconds: 86400 });
 }
 
 module.exports = { client, db, databaseName, uri, initializeDatabase };

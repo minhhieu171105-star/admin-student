@@ -1,37 +1,64 @@
-const path = require('path');
-const fs = require('fs');
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
-const esc = (s = '') => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const hidden = (name, value) => `<input type="hidden" name="${esc(name)}" value="${esc(value)}">`;
+const esc = (s = "") =>
+  String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const hidden = (name, value) =>
+  `<input type="hidden" name="${esc(name)}" value="${esc(value)}">`;
 
-function getInitials(name = '') {
+function getInitials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return String(name[0] || '?').toUpperCase();
+  if (parts.length >= 2)
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return String(name[0] || "?").toUpperCase();
 }
 
-function loginPage(error = '') {
-  return fs.readFileSync(path.join(__dirname, '..', 'public', 'login.html'), 'utf8')
-    .replace('{{ERROR}}', error ? `<div class="notice notice-error" role="alert">${esc(error)}</div>` : '');
+function loginPage(error = "") {
+  return fs
+    .readFileSync(path.join(__dirname, "..", "public", "login.html"), "utf8")
+    .replace(
+      "{{ERROR}}",
+      error
+        ? `<div class="notice notice-error" role="alert">${esc(error)}</div>`
+        : "",
+    );
 }
 
 function page(title, name, body) {
-  return fs.readFileSync(path.join(__dirname, '..', 'public', 'layout.html'), 'utf8')
-    .replace('{{TITLE}}', esc(title)).replace('{{NAME}}', esc(name)).replace('{{BODY}}', body);
+  return fs
+    .readFileSync(path.join(__dirname, "..", "public", "layout.html"), "utf8")
+    .replace("{{TITLE}}", esc(title))
+    .replace("{{NAME}}", esc(name))
+    .replace("{{BODY}}", body);
 }
 
-function removeForm(action, fields, label = 'Xóa', cls = 'delete-btn') {
-  return `<form method="post" action="/admin/action" class="inline-form" onsubmit="return confirm('Bạn có chắc muốn xóa?')">${hidden('action', action)}${Object.entries(fields).map(([k, v]) => hidden(k, v)).join('')}<button class="${cls}">${label}</button></form>`;
+function removeForm(action, fields, label = "Xóa", cls = "delete-btn") {
+  return `<form method="post" action="/admin/action" class="inline-form" onsubmit="return confirm('Bạn có chắc muốn xóa?')">${hidden("action", action)}${Object.entries(
+    fields,
+  )
+    .map(([k, v]) => hidden(k, v))
+    .join("")}<button class="${cls}">${label}</button></form>`;
 }
 
 function studentCard(s, tests = []) {
   const initials = getInitials(s.full_name || s.username);
-  const enrolledTests = tests.filter(t => (t.student_usernames || []).includes(s.username));
+  const enrolledTests = tests.filter((t) =>
+    (t.student_usernames || []).includes(s.username),
+  );
   const enrolledBadge = enrolledTests.length
-    ? `<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;margin-top:2px;">${enrolledTests.length} môn: ${enrolledTests.map(t => esc(t.title)).join(', ')}</span>`
+    ? `<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;margin-top:2px;">${enrolledTests.length} môn: ${enrolledTests.map((t) => esc(t.title)).join(", ")}</span>`
     : `<span style="color:var(--muted);font-size:11px;">Chưa gán môn</span>`;
 
-  const testOptions = tests.map(t => `<option value="${esc(t._id)}">${esc(t.title)}</option>`).join('');
+  const testOptions = tests
+    .map((t) => `<option value="${esc(t._id)}">${esc(t.title)}</option>`)
+    .join("");
 
   return `
 <div class="student-card">
@@ -46,7 +73,7 @@ function studentCard(s, tests = []) {
   <div class="detail-grid">
     <div class="detail-item">
       <span class="detail-label">NGÀY SINH</span>
-      <span class="detail-value">${esc(s.birth_date || '—')}</span>
+      <span class="detail-value">${esc(s.birth_date || "—")}</span>
     </div>
     <div class="detail-item">
       <span class="detail-label">MÔN THI ĐÃ GÁN</span>
@@ -55,109 +82,303 @@ function studentCard(s, tests = []) {
   </div>
   <div style="margin:10px 0;padding:8px;background:var(--canvas);border-radius:8px;border:1px solid var(--line);">
     <form method="post" action="/admin/action" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-      ${hidden('action', 'assign_subject')}
-      ${hidden('student_username', s.username)}
+      ${hidden("action", "assign_subject")}
+      ${hidden("student_username", s.username)}
       <select name="test_id" required style="flex:1;min-width:140px;min-height:34px;padding:4px 8px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:#fff;">
         <option value="">+ Gán vào môn thi...</option>
-        ${tests.length ? '<option value="all">⭐ Tất cả các môn đang mở</option>' : ''}
+        ${tests.length ? '<option value="all">⭐ Tất cả các môn đang mở</option>' : ""}
         ${testOptions}
       </select>
       <button type="submit" style="min-height:34px;padding:4px 12px;font-size:12px;border-radius:6px;">Gán</button>
     </form>
   </div>
   <div class="card-actions">
-    ${removeForm('student_trash', { username: s.username }, '🗑️ Xóa', 'delete-btn')}
+    ${removeForm("student_trash", { username: s.username }, "🗑️ Xóa", "delete-btn")}
   </div>
 </div>`;
 }
 
 function progressRows(progress) {
-  if (!progress.length) return '<tr><td colspan="7" class="empty-state">Chưa có dữ liệu làm bài.</td></tr>';
-  return progress.map(item => `<tr><td>${esc(item.test)}</td><td>${esc(item.name)}</td><td>${esc(item.status)}</td><td>${item.attempt_count} / ${item.max_attempts === 0 ? '∞' : item.max_attempts}</td><td>${esc(item.score)}</td><td>${item.violations || 0}</td><td>${item.attempt_count ? removeForm('attempt_delete', { test_id: item.test_id, username: item.username, view: 'exams' }, 'Xóa tiến độ', 'delete-btn') : ''}</td></tr>`).join('');
+  if (!progress.length)
+    return '<tr><td colspan="7" class="empty-state">Chưa có dữ liệu làm bài.</td></tr>';
+  return progress
+    .map(
+      (item) =>
+        `<tr><td>${esc(item.test)}</td><td>${esc(item.name)}</td><td>${esc(item.status)}</td><td>${item.attempt_count} / ${item.max_attempts === 0 ? "∞" : item.max_attempts}</td><td>${esc(item.score)}</td><td>${item.violations || 0}</td><td>${item.attempt_count ? removeForm("attempt_delete", { test_id: item.test_id, username: item.username, view: "exams" }, "Xóa tiến độ", "delete-btn") : ""}</td></tr>`,
+    )
+    .join("");
 }
 
 function testRows(tests, view) {
-  if (!tests.length) return '<tr><td colspan="7" class="empty-state">Chưa có kỳ thi nào.</td></tr>';
-  return tests.map(test => {
-    const qCount = test.total_questions || (test.questions || []).length;
-    const qps = test.questions_per_student || qCount;
-    const studentCount = (test.student_usernames || []).length;
-    return `<tr>
+  if (!tests.length)
+    return '<tr><td colspan="7" class="empty-state">Chưa có kỳ thi nào.</td></tr>';
+  return tests
+    .map((test) => {
+      const qCount = test.total_questions || (test.questions || []).length;
+      const qps = test.questions_per_student || qCount;
+      const studentCount = (test.student_usernames || []).length;
+      return `<tr>
       <td><a href="/admin?view=accounts&amp;test_id=${encodeURIComponent(String(test._id))}"><strong>${esc(test.title)}</strong></a><br><small style="color:var(--muted)">${studentCount} học sinh được gán</small></td>
-      <td>${new Date(test.starts_at * 1000).toLocaleString('vi-VN')}</td>
-      <td>${test.no_deadline ? 'Không giới hạn' : new Date(test.ends_at * 1000).toLocaleString('vi-VN')}</td>
+      <td>${new Date(test.starts_at * 1000).toLocaleString("vi-VN")}</td>
+      <td>${test.no_deadline ? "Không giới hạn" : new Date(test.ends_at * 1000).toLocaleString("vi-VN")}</td>
       <td>${Number(test.duration_minutes)} phút</td>
-      <td>${qps} / ${qCount} câu${test.shuffle_questions ? ' (Đảo đề)' : ''}</td>
-      <td>${test.max_attempts === 0 ? 'Vô số (∞)' : test.max_attempts ?? 1}</td>
-      <td>${removeForm('test_delete', { test_id: test._id, view }, '🗑️ Xóa', 'delete-btn')}</td>
+      <td>${qps} / ${qCount} câu${test.shuffle_questions ? " (Đảo đề)" : ""}</td>
+      <td>${test.max_attempts === 0 ? "Vô số (∞)" : (test.max_attempts ?? 1)}</td>
+      <td>${removeForm("test_delete", { test_id: test._id, view }, "🗑️ Xóa", "delete-btn")}</td>
     </tr>`;
-  }).join('');
+    })
+    .join("");
 }
 
-function renderAdmin({ name, students, trash, tests, progress, view, selectedTestId = '', message, error }) {
+function vocabCard(v) {
+  const wordCount = v.words?.length || v.total_words || 0;
+  const studentCount = (v.student_usernames || []).length;
+  return `<a class="subject-card" href="/admin?view=accounts&amp;vocab_id=${encodeURIComponent(String(v._id))}"><span class="subject-card-icon">📖</span><span class="subject-card-body"><strong>${esc(v.title)}</strong><small>${esc(v.language || "Ngoại ngữ")} · ${esc(v.level || "Cơ bản")}</small><em>${wordCount} từ vựng · ${studentCount} học sinh</em></span><span class="subject-card-arrow">›</span></a>`;
+}
+
+function renderAdmin({
+  name,
+  students,
+  trash,
+  tests,
+  progress,
+  vocabSets = [],
+  selectedVocabId = "",
+  view,
+  selectedTestId = "",
+  message,
+  error,
+}) {
   const current = Math.floor(Date.now() / 1000);
-  const activeTests = tests.filter(test => Number(test.ends_at) >= current);
-  const finishedTests = tests.filter(test => Number(test.ends_at) < current);
+  const activeTests = tests.filter((test) => Number(test.ends_at) >= current);
+  const finishedTests = tests.filter((test) => Number(test.ends_at) < current);
 
   const tabs = [
-    ['accounts', '👥 Môn học & học sinh', students.length],
-    ['exams', '📝 Giao đề & Kỳ thi', activeTests.length],
-    ['finished-exams', '✅ Đã kết thúc', finishedTests.length],
+    ["accounts", "👥 Môn học & học sinh", students.length],
+    ["exams", "📝 Giao đề & Kỳ thi", activeTests.length],
+    ["finished-exams", "✅ Đã kết thúc", finishedTests.length],
+    ["vocab", "📖 Luyện từ vựng", vocabSets.length],
   ];
 
-  const tabNav = `<div class="tab-nav">${tabs.map(([key, label, count]) => `<button class="tab-btn${view === key ? ' active' : ''}" onclick="location.href='/admin?view=${key}'">${label}${count !== null ? `<span class="tab-count">${count}</span>` : ''}</button>`).join('')}</div>`;
+  const tabNav = `<div class="tab-nav">${tabs.map(([key, label, count]) => `<button class="tab-btn${view === key ? " active" : ""}" onclick="location.href='/admin?view=${key}'">${label}${count !== null ? `<span class="tab-count">${count}</span>` : ""}</button>`).join("")}</div>`;
 
-  const testSelectOptions = tests.map(t => `<option value="${esc(t._id)}">${esc(t.title)}</option>`).join('');
+  const testSelectOptions = tests
+    .map((t) => `<option value="${esc(t._id)}">${esc(t.title)}</option>`)
+    .join("");
 
-  let content = '';
+  let content = "";
 
-  if (view === 'accounts') {
-    const selectedTest = tests.find(test => String(test._id) === selectedTestId);
-    if (selectedTestId === 'legacy-all-accounts') {
-      const accountRows = students.length ? students.map(student => `<tr><td>${esc(student.full_name || student.username)}</td><td>${esc(student.username)}</td><td>${esc(student.birth_date || '')}</td></tr>`).join('') : '<tr><td colspan="3" class="empty-state">Chưa có tài khoản học sinh.</td></tr>';
-      content = `<div class="section-header"><div><p class="section-title">Tài khoản riêng</p><p class="section-sub">Tạo tài khoản trước, sau đó có thể gán toàn bộ vào một môn thi.</p></div><a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi</a></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="button" href="/admin?view=add-account">+ Thêm tài khoản</a><a class="button button-secondary" href="/admin?view=import-accounts">Nhập từ Excel</a></div><form method="post" action="/admin/action" style="margin-top:18px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">${hidden('action', 'assign_subject')}${hidden('student_username', '__ALL__')}<div style="min-width:260px;flex:1"><label>Gán tất cả ${students.length} tài khoản vào môn thi</label><select name="test_id" required><option value="">-- Chọn môn thi --</option>${testSelectOptions}</select></div><button type="submit">Gán tất cả vào môn</button></form></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Tên đăng nhập</th><th>Ngày sinh</th></tr></thead><tbody>${accountRows}</tbody></table></div></div>`;
-    } else if (selectedTest) {
-      const rows = progress.filter(item => item.test_id === String(selectedTest._id));
-      const availableStudents = students.filter(student => !(selectedTest.student_usernames || []).includes(student.username));
-      const tableRows = rows.length ? rows.map((item, index) => `<tr data-student="${esc(item.username)}"><td>${index + 1}</td><td>${esc(item.name)}</td><td>${esc(item.username)}</td><td data-field="status">${esc(item.status)}</td><td data-field="attempts">${item.attempt_count} / ${item.max_attempts === 0 ? '∞' : item.max_attempts}</td><td data-field="score">${esc(item.score)}</td><td data-field="violations">${item.violations || 0}</td><td>${removeForm('subject_student_remove', { username: item.username, test_id: selectedTest._id, test_id_return: selectedTest._id }, 'Xóa khỏi môn', 'delete-btn')}</td></tr>`).join('') : '<tr><td colspan="8" class="empty-state">Chưa có học sinh được gán vào môn thi này.</td></tr>';
-      const memberTools = `<div class="grid" style="margin-bottom:16px"><section class="card"><h2>Thêm học sinh vào môn</h2><form method="post" action="/admin/action">${hidden('action', 'student_manual')}${hidden('test_id', selectedTest._id)}${hidden('return_test_id', selectedTest._id)}<label>Họ tên học sinh</label><input name="full_name" required><label>Ngày sinh</label><input name="birth_date" type="date" required><button>Thêm vào môn</button></form></section><section class="card"><h2>Nhập danh sách Excel</h2><form method="post" action="/admin/action" enctype="multipart/form-data">${hidden('action', 'students')}${hidden('test_id', selectedTest._id)}${hidden('return_test_id', selectedTest._id)}<label>Tệp Excel .xlsx</label><input type="file" name="sheet" accept=".xlsx" required><p class="card-intro">Cột A: STT · Cột B: họ tên/tên đăng nhập · Cột C: ngày sinh.</p><button>Nhập vào môn</button></form></section></div>`;
+  if (view === "accounts") {
+    const selectedTest = tests.find(
+      (test) => String(test._id) === selectedTestId,
+    );
+    const selectedVocab = vocabSets.find(
+      (v) => String(v._id) === selectedVocabId,
+    );
+
+    if (selectedVocab) {
+      const vocabStudents = students.filter((student) =>
+        (selectedVocab.student_usernames || []).includes(student.username),
+      );
+      const availableStudents = students.filter(
+        (student) =>
+          !(selectedVocab.student_usernames || []).includes(student.username),
+      );
+
+      const memberTools = `<div class="grid" style="margin-bottom:16px">
+        <section class="card">
+          <h2>Thêm học sinh vào bộ từ vựng</h2>
+          <form method="post" action="/admin/action">
+            ${hidden("action", "vocab_student_manual")}
+            ${hidden("vocab_id", selectedVocab._id)}
+            <label>Họ tên học sinh</label>
+            <input name="full_name" required>
+            <label>Ngày sinh</label>
+            <input name="birth_date" type="date" required>
+            <button>Thêm vào bộ từ</button>
+          </form>
+        </section>
+        <section class="card">
+          <h2>Nhập danh sách Excel</h2>
+          <form method="post" action="/admin/action" enctype="multipart/form-data">
+            ${hidden("action", "vocab_students_excel")}
+            ${hidden("vocab_id", selectedVocab._id)}
+            <label>Tệp Excel .xlsx</label>
+            <input type="file" name="sheet" accept=".xlsx" required>
+            <p class="card-intro">Cột A: STT · Cột B: họ tên/tên đăng nhập · Cột C: ngày sinh.</p>
+            <button>Nhập vào bộ từ</button>
+          </form>
+        </section>
+      </div>`;
+
       const existingAccounts = availableStudents.length
-        ? `<section class="card" style="margin-bottom:16px"><div class="section-heading"><div><h2>Thêm tài khoản có sẵn</h2><p class="card-intro">Mở danh sách rồi chọn các học sinh cần gán vào môn này.</p></div><button type="button" data-show-account-picker>Thêm tài khoản có sẵn (${availableStudents.length})</button></div><form method="post" action="/admin/action" id="available-account-picker" hidden>${hidden('action', 'assign_subject')}${hidden('test_id', selectedTest._id)}${hidden('return_test_id', selectedTest._id)}<div class="table-wrap"><table><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả" data-select-all></th><th>Họ tên</th><th>Ngày sinh</th></tr></thead><tbody>${availableStudents.map(student => `<tr><td><input type="checkbox" name="student_username" value="${esc(student.username)}" data-available-student></td><td>${esc(student.full_name || student.username)}</td><td>${esc(student.birth_date || '')}</td></tr>`).join('')}</tbody></table></div><div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="button-secondary" data-select-all>Thêm tất cả</button><button type="submit">Thêm học sinh đã chọn</button><button type="button" class="button-secondary" data-hide-account-picker>Đóng danh sách</button></div></form></section>`
+        ? `<section class="card" style="margin-bottom:16px">
+            <div class="section-heading">
+              <div>
+                <h2>Thêm tài khoản có sẵn</h2>
+                <p class="card-intro">Mở danh sách rồi chọn các học sinh cần gán vào bộ từ vựng này.</p>
+              </div>
+              <button type="button" data-show-account-picker>Thêm tài khoản có sẵn (${availableStudents.length})</button>
+            </div>
+            <form method="post" action="/admin/action" id="available-account-picker" hidden>
+              ${hidden("action", "vocab_assign")}
+              ${hidden("vocab_id", selectedVocab._id)}
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th><input type="checkbox" aria-label="Chọn tất cả" data-select-all></th><th>Họ tên</th><th>Ngày sinh</th></tr></thead>
+                  <tbody>${availableStudents.map((student) => `<tr><td><input type="checkbox" name="student_username" value="${esc(student.username)}" data-available-student></td><td>${esc(student.full_name || student.username)}</td><td>${esc(student.birth_date || "")}</td></tr>`).join("")}</tbody>
+                </table>
+              </div>
+              <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+                <button type="button" class="button-secondary" data-select-all>Thêm tất cả</button>
+                <button type="submit">Thêm học sinh đã chọn</button>
+                <button type="button" class="button-secondary" data-hide-account-picker>Đóng danh sách</button>
+              </div>
+            </form>
+          </section>`
+        : "";
+
+      const studentRows = vocabStudents.length
+        ? vocabStudents
+            .map(
+              (s, idx) =>
+                `<tr><td>${idx + 1}</td><td>${esc(s.full_name || s.username)}</td><td>${esc(s.username)}</td><td>${esc(s.birth_date || "—")}</td><td>${removeForm("vocab_student_remove", { vocab_id: selectedVocab._id, username: s.username }, "Xóa khỏi bộ", "delete-btn")}</td></tr>`,
+            )
+            .join("")
+        : '<tr><td colspan="5" class="empty-state">Chưa có học sinh nào được gán vào bộ từ vựng này.</td></tr>';
+
+      const wordRows = (selectedVocab.words || [])
+        .map(
+          (w, idx) =>
+            `<tr><td>${idx + 1}</td><td><strong>${esc(w.word)}</strong></td><td><code style="color:var(--primary);">${esc(w.phonetic || "—")}</code></td><td>${esc(w.meaning)}</td></tr>`,
+        )
+        .join("");
+
+      content = `
+        <div class="section-header">
+          <div>
+            <p class="section-title">${esc(selectedVocab.title)}</p>
+            <p class="section-sub"><span class="vocab-badge-lang">${esc(selectedVocab.language)}</span> <span class="vocab-badge-level">${esc(selectedVocab.level)}</span> · ${selectedVocab.words?.length || 0} từ vựng · ${vocabStudents.length} học sinh được gán</p>
+          </div>
+          <a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi &amp; từ vựng</a>
+        </div>
+        ${memberTools}
+        ${existingAccounts}
+        <div class="card" style="margin-bottom:16px;">
+          <h2 style="font-size:16px;margin-bottom:12px;">👥 Danh sách học sinh được ôn luyện (${vocabStudents.length})</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>STT</th><th>Họ tên</th><th>Tên đăng nhập</th><th>Ngày sinh</th><th>Thao tác</th></tr></thead>
+              <tbody>${studentRows}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2 style="font-size:16px;margin-bottom:12px;">📖 Danh sách từ vựng trong bộ (${selectedVocab.words?.length || 0} từ)</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>STT</th><th>Từ vựng</th><th>Phiên âm</th><th>Tiếng Việt (Nghĩa)</th></tr></thead>
+              <tbody>${wordRows || '<tr><td colspan="4" class="empty-state">Chưa có từ vựng.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else if (selectedTestId === "legacy-all-accounts") {
+      const accountRows = students.length
+        ? students
+            .map(
+              (student) =>
+                `<tr><td>${esc(student.full_name || student.username)}</td><td>${esc(student.username)}</td><td>${esc(student.birth_date || "")}</td></tr>`,
+            )
+            .join("")
+        : '<tr><td colspan="3" class="empty-state">Chưa có tài khoản học sinh.</td></tr>';
+      content = `<div class="section-header"><div><p class="section-title">Tài khoản riêng</p><p class="section-sub">Tạo tài khoản trước, sau đó có thể gán toàn bộ vào một môn thi.</p></div><a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi</a></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="button" href="/admin?view=add-account">+ Thêm tài khoản</a><a class="button button-secondary" href="/admin?view=import-accounts">Nhập từ Excel</a></div><form method="post" action="/admin/action" style="margin-top:18px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">${hidden("action", "assign_subject")}${hidden("student_username", "__ALL__")}<div style="min-width:260px;flex:1"><label>Gán tất cả ${students.length} tài khoản vào môn thi</label><select name="test_id" required><option value="">-- Chọn môn thi --</option>${testSelectOptions}</select></div><button type="submit">Gán tất cả vào môn</button></form></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Tên đăng nhập</th><th>Ngày sinh</th></tr></thead><tbody>${accountRows}</tbody></table></div></div>`;
+    } else if (selectedTest) {
+      const rows = progress.filter(
+        (item) => item.test_id === String(selectedTest._id),
+      );
+      const availableStudents = students.filter(
+        (student) =>
+          !(selectedTest.student_usernames || []).includes(student.username),
+      );
+      const tableRows = rows.length
+        ? rows
+            .map(
+              (item, index) =>
+                `<tr data-student="${esc(item.username)}"><td>${index + 1}</td><td>${esc(item.name)}</td><td>${esc(item.username)}</td><td data-field="status">${esc(item.status)}</td><td data-field="attempts">${item.attempt_count} / ${item.max_attempts === 0 ? "∞" : item.max_attempts}</td><td data-field="score">${esc(item.score)}</td><td data-field="violations">${item.violations || 0}</td><td>${removeForm("subject_student_remove", { username: item.username, test_id: selectedTest._id, test_id_return: selectedTest._id }, "Xóa khỏi môn", "delete-btn")}</td></tr>`,
+            )
+            .join("")
+        : '<tr><td colspan="8" class="empty-state">Chưa có học sinh được gán vào môn thi này.</td></tr>';
+      const memberTools = `<div class="grid" style="margin-bottom:16px"><section class="card"><h2>Thêm học sinh vào môn</h2><form method="post" action="/admin/action">${hidden("action", "student_manual")}${hidden("test_id", selectedTest._id)}${hidden("return_test_id", selectedTest._id)}<label>Họ tên học sinh</label><input name="full_name" required><label>Ngày sinh</label><input name="birth_date" type="date" required><button>Thêm vào môn</button></form></section><section class="card"><h2>Nhập danh sách Excel</h2><form method="post" action="/admin/action" enctype="multipart/form-data">${hidden("action", "students")}${hidden("test_id", selectedTest._id)}${hidden("return_test_id", selectedTest._id)}<label>Tệp Excel .xlsx</label><input type="file" name="sheet" accept=".xlsx" required><p class="card-intro">Cột A: STT · Cột B: họ tên/tên đăng nhập · Cột C: ngày sinh.</p><button>Nhập vào môn</button></form></section></div>`;
+      const existingAccounts = availableStudents.length
+        ? `<section class="card" style="margin-bottom:16px"><div class="section-heading"><div><h2>Thêm tài khoản có sẵn</h2><p class="card-intro">Mở danh sách rồi chọn các học sinh cần gán vào môn này.</p></div><button type="button" data-show-account-picker>Thêm tài khoản có sẵn (${availableStudents.length})</button></div><form method="post" action="/admin/action" id="available-account-picker" hidden>${hidden("action", "assign_subject")}${hidden("test_id", selectedTest._id)}${hidden("return_test_id", selectedTest._id)}<div class="table-wrap"><table><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả" data-select-all></th><th>Họ tên</th><th>Ngày sinh</th></tr></thead><tbody>${availableStudents.map((student) => `<tr><td><input type="checkbox" name="student_username" value="${esc(student.username)}" data-available-student></td><td>${esc(student.full_name || student.username)}</td><td>${esc(student.birth_date || "")}</td></tr>`).join("")}</tbody></table></div><div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="button-secondary" data-select-all>Thêm tất cả</button><button type="submit">Thêm học sinh đã chọn</button><button type="button" class="button-secondary" data-hide-account-picker>Đóng danh sách</button></div></form></section>`
         : `<section class="card" style="margin-bottom:16px"><div class="empty-state">Tất cả tài khoản học sinh hiện có đã được thêm vào môn này.</div></section>`;
-      const removeAllStudents = rows.length ? `<form method="post" action="/admin/action" style="margin:0 0 14px" onsubmit="return confirm('Xóa toàn bộ học sinh khỏi môn này và xóa các lượt làm liên quan?')">${hidden('action', 'subject_students_remove_all')}${hidden('test_id', selectedTest._id)}<button type="submit" class="button-danger">Xóa tất cả học sinh của môn</button></form>` : '';
+      const removeAllStudents = rows.length
+        ? `<form method="post" action="/admin/action" style="margin:0 0 14px" onsubmit="return confirm('Xóa toàn bộ học sinh khỏi môn này và xóa các lượt làm liên quan?')">${hidden("action", "subject_students_remove_all")}${hidden("test_id", selectedTest._id)}<button type="submit" class="button-danger">Xóa tất cả học sinh của môn</button></form>`
+        : "";
       content = `<div class="section-header"><div><p class="section-title">${esc(selectedTest.subject || selectedTest.title)}</p><p class="section-sub">${esc(selectedTest.title)} · Tiến độ làm bài của ${rows.length} học sinh</p></div><a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi</a></div>${memberTools}${existingAccounts}<div class="card">${removeAllStudents}<div class="table-wrap"><table id="subject-progress"><thead><tr><th>STT</th><th>Họ tên</th><th>Tên đăng nhập</th><th>Trạng thái</th><th>Lượt làm</th><th>Điểm</th><th>Rời trang</th><th></th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
     } else {
-      const subjectCards = tests.map(test => {
-        const enrolled = students.filter(student => (test.student_usernames || []).includes(student.username)).length;
-        const ended = Number(test.ends_at) < current;
-        return `<a class="subject-card" href="/admin?view=accounts&amp;test_id=${encodeURIComponent(String(test._id))}"><span class="subject-card-icon">📚</span><span class="subject-card-body"><strong>${esc(test.subject || test.title)}</strong><small>${esc(test.title)}</small><em>${enrolled} học sinh${ended ? ' · Đã kết thúc' : ''}</em></span><span class="subject-card-arrow">›</span></a>`;
-      }).join('');
-      content = `<div class="section-header"><div><p class="section-title">Danh sách môn thi</p><p class="section-sub">Chọn một môn để thêm học sinh, nhập Excel và xem tiến độ.</p></div></div><div class="subject-grid">${subjectCards || '<div class="card"><div class="empty-state">Chưa có môn thi nào. Hãy tạo kỳ thi trước.</div></div>'}</div>`;
+      const subjectCards = tests
+        .map((test) => {
+          const enrolled = students.filter((student) =>
+            (test.student_usernames || []).includes(student.username),
+          ).length;
+          const ended = Number(test.ends_at) < current;
+          return `<a class="subject-card" href="/admin?view=accounts&amp;test_id=${encodeURIComponent(String(test._id))}"><span class="subject-card-icon">📚</span><span class="subject-card-body"><strong>${esc(test.subject || test.title)}</strong><small>${esc(test.title)}</small><em>${enrolled} học sinh${ended ? " · Đã kết thúc" : ""}</em></span><span class="subject-card-arrow">›</span></a>`;
+        })
+        .join("");
+      const vocabSliderCards = vocabSets.map((v) => vocabCard(v)).join("");
+      content = `
+        <div class="section-header"><div><p class="section-title">Danh sách môn thi</p><p class="section-sub">Chọn một môn để thêm học sinh, nhập Excel và xem tiến độ.</p></div></div>
+        <div class="subject-grid" style="margin-bottom:28px;">${subjectCards || '<div class="card"><div class="empty-state">Chưa có môn thi nào. Hãy tạo kỳ thi trước.</div></div>'}</div>
+        <div class="section-header"><div><p class="section-title">Danh sách ôn từ vựng</p><p class="section-sub">Chọn một bộ từ vựng để thêm học sinh và quản lý danh sách.</p></div></div>
+        <div class="subject-grid">${vocabSliderCards || '<div class="card"><div class="empty-state">Chưa có bộ từ vựng nào.</div></div>'}</div>
+      `;
     }
-  } else if (view === 'legacy-accounts') {
-    const selectedTest = tests.find(test => String(test._id) === selectedTestId);
-    const isUnassigned = selectedTestId === 'unassigned';
+  } else if (view === "legacy-accounts") {
+    const selectedTest = tests.find(
+      (test) => String(test._id) === selectedTestId,
+    );
+    const isUnassigned = selectedTestId === "unassigned";
     if (selectedTest || isUnassigned) {
       const subjectStudents = isUnassigned
-        ? students.filter(student => !tests.some(test => (test.student_usernames || []).includes(student.username)))
-        : students.filter(student => (selectedTest.student_usernames || []).includes(student.username));
-      const heading = isUnassigned ? 'Học sinh chưa gán môn thi' : (selectedTest.subject || selectedTest.title);
+        ? students.filter(
+            (student) =>
+              !tests.some((test) =>
+                (test.student_usernames || []).includes(student.username),
+              ),
+          )
+        : students.filter((student) =>
+            (selectedTest.student_usernames || []).includes(student.username),
+          );
+      const heading = isUnassigned
+        ? "Học sinh chưa gán môn thi"
+        : selectedTest.subject || selectedTest.title;
       const description = isUnassigned
-        ? 'Các tài khoản này chưa được gán vào bất kỳ môn thi nào.'
+        ? "Các tài khoản này chưa được gán vào bất kỳ môn thi nào."
         : `${selectedTest.title} · ${subjectStudents.length} học sinh được gán`;
-      content = `<div class="section-header"><div><p class="section-title">${esc(heading)}</p><p class="section-sub">${esc(description)}</p></div><a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi</a></div><div class="search-row"><div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="search" placeholder="Tìm họ tên, tài khoản..." oninput="filterSubjectStudents(this.value)"></div></div><div id="student-list">${subjectStudents.length ? subjectStudents.map(student => studentCard(student, tests)).join('') : '<div class="card"><div class="empty-state">Chưa có học sinh trong môn thi này.</div></div>'}</div><script>function filterSubjectStudents(query){const text=query.toLowerCase();document.querySelectorAll('#student-list .student-card').forEach(card=>card.style.display=card.textContent.toLowerCase().includes(text)?'':'none')}</script>`;
+      content = `<div class="section-header"><div><p class="section-title">${esc(heading)}</p><p class="section-sub">${esc(description)}</p></div><a class="add-btn" href="/admin?view=accounts">← Danh sách môn thi</a></div><div class="search-row"><div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="search" placeholder="Tìm họ tên, tài khoản..." oninput="filterSubjectStudents(this.value)"></div></div><div id="student-list">${subjectStudents.length ? subjectStudents.map((student) => studentCard(student, tests)).join("") : '<div class="card"><div class="empty-state">Chưa có học sinh trong môn thi này.</div></div>'}</div><script>function filterSubjectStudents(query){const text=query.toLowerCase();document.querySelectorAll('#student-list .student-card').forEach(card=>card.style.display=card.textContent.toLowerCase().includes(text)?'':'none')}</script>`;
     } else {
-      const subjectCards = tests.map(test => {
-        const enrolled = students.filter(student => (test.student_usernames || []).includes(student.username)).length;
-        const ended = Number(test.ends_at) < current;
-        return `<a class="subject-card" href="/admin?view=accounts&amp;test_id=${encodeURIComponent(String(test._id))}"><span class="subject-card-icon">📚</span><span class="subject-card-body"><strong>${esc(test.subject || test.title)}</strong><small>${esc(test.title)}</small><em>${enrolled} học sinh${ended ? ' · Đã kết thúc' : ''}</em></span><span class="subject-card-arrow">›</span></a>`;
-      }).join('');
-      const unassigned = students.filter(student => !tests.some(test => (test.student_usernames || []).includes(student.username))).length;
-      content = `<div class="section-header"><div><p class="section-title">Danh sách môn thi</p><p class="section-sub">Chọn một môn thi để xem danh sách tài khoản học sinh.</p></div><a class="add-btn" href="/admin?view=add-account">+ Thêm mới</a></div><div class="subject-grid">${subjectCards || '<div class="card"><div class="empty-state">Chưa có môn thi nào. Hãy tạo kỳ thi trước.</div></div>'}${unassigned ? `<a class="subject-card subject-card-muted" href="/admin?view=accounts&amp;test_id=unassigned"><span class="subject-card-icon">👥</span><span class="subject-card-body"><strong>Chưa gán môn</strong><small>Tài khoản chưa thuộc môn thi nào</small><em>${unassigned} học sinh</em></span><span class="subject-card-arrow">›</span></a>` : ''}</div>`;
+      const subjectCards = tests
+        .map((test) => {
+          const enrolled = students.filter((student) =>
+            (test.student_usernames || []).includes(student.username),
+          ).length;
+          const ended = Number(test.ends_at) < current;
+          return `<a class="subject-card" href="/admin?view=accounts&amp;test_id=${encodeURIComponent(String(test._id))}"><span class="subject-card-icon">📚</span><span class="subject-card-body"><strong>${esc(test.subject || test.title)}</strong><small>${esc(test.title)}</small><em>${enrolled} học sinh${ended ? " · Đã kết thúc" : ""}</em></span><span class="subject-card-arrow">›</span></a>`;
+        })
+        .join("");
+      const unassigned = students.filter(
+        (student) =>
+          !tests.some((test) =>
+            (test.student_usernames || []).includes(student.username),
+          ),
+      ).length;
+      content = `<div class="section-header"><div><p class="section-title">Danh sách môn thi</p><p class="section-sub">Chọn một môn thi để xem danh sách tài khoản học sinh.</p></div><a class="add-btn" href="/admin?view=add-account">+ Thêm mới</a></div><div class="subject-grid">${subjectCards || '<div class="card"><div class="empty-state">Chưa có môn thi nào. Hãy tạo kỳ thi trước.</div></div>'}${unassigned ? `<a class="subject-card subject-card-muted" href="/admin?view=accounts&amp;test_id=unassigned"><span class="subject-card-icon">👥</span><span class="subject-card-body"><strong>Chưa gán môn</strong><small>Tài khoản chưa thuộc môn thi nào</small><em>${unassigned} học sinh</em></span><span class="subject-card-arrow">›</span></a>` : ""}</div>`;
     }
-  } else if (view === 'legacy-accounts') {
+  } else if (view === "legacy-accounts") {
     const cards = students.length
-      ? students.map(s => studentCard(s, tests)).join('')
+      ? students.map((s) => studentCard(s, tests)).join("")
       : `<div class="card"><div class="empty-state">📂 Chưa có học sinh nào trong hệ thống.</div></div>`;
     content = `
 <div class="search-row">
@@ -175,11 +396,11 @@ function renderAdmin({ name, students, trash, tests, progress, view, selectedTes
       <p style="margin:2px 0 0;font-size:12px;color:#15803d;">Chọn môn thi để cấp quyền thi cho toàn bộ học sinh đang có trong hệ thống.</p>
     </div>
     <form method="post" action="/admin/action" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      ${hidden('action', 'assign_subject')}
-      ${hidden('student_username', '__ALL__')}
+      ${hidden("action", "assign_subject")}
+      ${hidden("student_username", "__ALL__")}
       <select name="test_id" required style="min-height:38px;padding:6px 12px;border-radius:8px;font-size:13px;background:#fff;">
         <option value="">-- Chọn môn thi --</option>
-        ${tests.length ? '<option value="all">⭐ Tất cả các kỳ thi đang mở</option>' : ''}
+        ${tests.length ? '<option value="all">⭐ Tất cả các kỳ thi đang mở</option>' : ""}
         ${testSelectOptions}
       </select>
       <button type="submit" style="background:#16a34a;min-height:38px;padding:6px 16px;font-size:13px;border-radius:8px;">Áp dụng cho tất cả</button>
@@ -191,8 +412,8 @@ function renderAdmin({ name, students, trash, tests, progress, view, selectedTes
   <h2 style="font-size:18px;margin-bottom:6px;">Thêm danh sách học sinh vào môn</h2>
   <p class="card-intro">Tệp Excel: cột A là họ tên/tên đăng nhập, cột B là ngày sinh. Chọn môn để gán danh sách ngay sau khi nhập.</p>
   <form method="post" action="/admin/action" enctype="multipart/form-data">
-    ${hidden('action', 'students')}
-    ${hidden('view', 'exams')}
+    ${hidden("action", "students")}
+    ${hidden("view", "exams")}
     <div class="form-grid">
       <div><label>Môn thi</label><select name="test_id" required><option value="">-- Chọn môn thi --</option>${testSelectOptions}</select></div>
       <div><label>Tệp Excel danh sách học sinh</label><input type="file" name="sheet" accept=".xlsx" required></div>
@@ -222,22 +443,22 @@ function filterCards(q) {
   });
 }
 </script>`;
-  } else if (view === 'trash') {
+  } else if (view === "trash") {
     content = `
 <div class="section-header"><div><p class="section-title">Thùng rác</p><p class="section-sub">${trash.length} tài khoản đã xóa</p></div></div>
 <div class="card">
   <div class="table-wrap">
     <table><thead><tr><th>Họ tên</th><th>Ngày sinh</th><th>Thao tác</th></tr></thead><tbody>
-    ${trash.map(s => `<tr><td>${esc(s.full_name || s.username)}</td><td>${esc(s.birth_date || '')}</td><td><form method="post" action="/admin/action">${hidden('action', 'student_restore')}${hidden('username', s.username)}${hidden('view', 'trash')}<button class="edit-btn">↩️ Khôi phục</button></form></td></tr>`).join('') || '<tr><td colspan="3" class="empty-state">Thùng rác đang trống.</td></tr>'}
+    ${trash.map((s) => `<tr><td>${esc(s.full_name || s.username)}</td><td>${esc(s.birth_date || "")}</td><td><form method="post" action="/admin/action">${hidden("action", "student_restore")}${hidden("username", s.username)}${hidden("view", "trash")}<button class="edit-btn">↩️ Khôi phục</button></form></td></tr>`).join("") || '<tr><td colspan="3" class="empty-state">Thùng rác đang trống.</td></tr>'}
     </tbody></table>
   </div>
 </div>`;
-  } else if (view === 'add-account') {
+  } else if (view === "add-account") {
     content = `
 <div class="card" style="max-width:680px;margin:0 auto 20px;">
   <h2 style="font-size:18px;margin-bottom:6px;">➕ Thêm học sinh thủ công</h2>
   <p style="color:var(--muted);font-size:13px;margin:0 0 18px">Tên đăng nhập được tạo từ họ tên; mật khẩu đăng nhập của học sinh là ngày sinh.</p>
-  <form method="post" action="/admin/action">${hidden('action', 'student_manual')}
+  <form method="post" action="/admin/action">${hidden("action", "student_manual")}
     <label>Họ tên học sinh</label>
     <input name="full_name" placeholder="Ví dụ: Đặng Ngọc Thảo Phương" required>
     
@@ -247,7 +468,7 @@ function filterCards(q) {
     <label>Gán vào môn thi (tùy chọn)</label>
     <select name="test_id">
       <option value="">-- Chưa gán môn (có thể gán sau) --</option>
-      ${tests.length ? '<option value="all">⭐ Gán vào tất cả các môn đang mở</option>' : ''}
+      ${tests.length ? '<option value="all">⭐ Gán vào tất cả các môn đang mở</option>' : ""}
       ${testSelectOptions}
     </select>
     
@@ -257,19 +478,19 @@ function filterCards(q) {
     </div>
   </form>
 </div>`;
-  } else if (view === 'import-accounts') {
+  } else if (view === "import-accounts") {
     content = `
 <div class="card" style="max-width:680px;margin:0 auto 20px;">
   <h2 style="font-size:18px;margin-bottom:6px;">📋 Nhập danh sách học sinh từ Excel</h2>
   <p style="color:var(--muted);font-size:13px;margin:0 0 18px">File Excel gồm <strong>Cột A:</strong> Họ tên / Tên đăng nhập; <strong>Cột B:</strong> Ngày sinh (YYYY-MM-DD hoặc DD/MM/YYYY).</p>
-  <form method="post" action="/admin/action" enctype="multipart/form-data">${hidden('action', 'students')}
+  <form method="post" action="/admin/action" enctype="multipart/form-data">${hidden("action", "students")}
     <label>Chọn tệp Excel .xlsx danh sách học sinh</label>
     <input type="file" name="sheet" accept=".xlsx" required>
 
     <label>Gán toàn bộ danh sách vừa nhập vào môn thi nào:</label>
     <select name="test_id">
       <option value="">-- Chỉ tạo tài khoản, chưa gán môn thi --</option>
-      ${tests.length ? '<option value="all">⭐ Gán vào TẤT CẢ môn thi đang mở</option>' : ''}
+      ${tests.length ? '<option value="all">⭐ Gán vào TẤT CẢ môn thi đang mở</option>' : ""}
       ${testSelectOptions}
     </select>
 
@@ -279,17 +500,99 @@ function filterCards(q) {
     </div>
   </form>
 </div>`;
-  } else if (view === 'finished-exams') {
+  } else if (view === "finished-exams") {
     content = `
 <div class="section-header"><div><p class="section-title">Kỳ thi đã kết thúc</p><p class="section-sub">Các kỳ thi quá thời hạn làm bài.</p></div></div>
 <div class="card">
   <div class="table-wrap">
     <table><thead><tr><th>Tên kỳ thi / Môn</th><th>Bắt đầu</th><th>Kết thúc</th><th>Thời lượng</th><th>Số câu / Đề</th><th>Lượt tối đa</th><th>Thao tác</th></tr></thead>
-    <tbody>${testRows(finishedTests, 'finished-exams')}</tbody>
+    <tbody>${testRows(finishedTests, "finished-exams")}</tbody>
     </table>
   </div>
 </div>`;
-  } else if (view === 'legacy-progress-view') {
+  } else if (view === "vocab") {
+    const vocabListRows = vocabSets
+      .map(
+        (v, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td><strong><a href="/admin?view=accounts&amp;vocab_id=${encodeURIComponent(String(v._id))}">${esc(v.title)}</a></strong></td>
+        <td><span class="vocab-badge-lang">${esc(v.language || "Ngoại ngữ")}</span></td>
+        <td><span class="vocab-badge-level">${esc(v.level || "Cơ bản")}</span></td>
+        <td><strong>${v.words?.length || v.total_words || 0}</strong> từ</td>
+        <td><strong>${(v.student_usernames || []).length}</strong> học sinh</td>
+        <td>${v.created_at ? new Date(v.created_at * 1000).toLocaleDateString("vi-VN") : "—"}</td>
+        <td style="display:flex;gap:6px;align-items:center;">
+          <a class="edit-btn" href="/admin?view=accounts&amp;vocab_id=${encodeURIComponent(String(v._id))}">Chi tiết</a>
+          ${removeForm("vocab_delete", { vocab_id: v._id, view: "vocab" }, "🗑️ Xóa", "delete-btn")}
+        </td>
+      </tr>
+    `,
+      )
+      .join("");
+
+    content = `
+<div class="card" style="margin-bottom:24px;">
+  <div style="border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:18px;">
+    <h2 style="font-size:18px;margin:0 0 4px;color:var(--ink);">📖 Thêm bộ từ vựng &amp; Giao cho học sinh</h2>
+    <p style="margin:0;font-size:13px;color:var(--muted);">Nhập từ vựng kèm phiên âm và nghĩa tiếng Việt từ file Excel, phân loại theo ngôn ngữ / cấp độ.</p>
+  </div>
+
+  <form method="post" action="/admin/action" enctype="multipart/form-data">
+    ${hidden("action", "vocab_create")}
+    ${hidden("view", "vocab")}
+    ${hidden("submission_key", crypto.randomUUID())}
+
+    <div class="form-grid" style="margin-bottom:12px;">
+      <div>
+        <label>Tên ngôn ngữ <span style="color:var(--danger)">*</span></label>
+        <input name="language" placeholder="VD: Tiếng Anh, Tiếng Nhật, Tiếng Hàn..." required>
+      </div>
+      <div>
+        <label>Cấp độ <span style="color:var(--danger)">*</span></label>
+        <input name="level" placeholder="VD: A1, A2, B1, B2, C1, N5, N4, HSK 1..." required>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-bottom:12px;">
+      <div>
+        <label>📂 Tệp Excel từ vựng (.xlsx) <span style="color:var(--danger)">*</span></label>
+        <input name="vocab_sheet" type="file" accept=".xlsx" required>
+        <p style="margin:4px 0 0;font-size:12px;color:var(--muted);">Cột A: STT · Cột B: Từ vựng · Cột C: Phiên âm · Cột D: Tiếng Việt (nghĩa từ vựng)</p>
+      </div>
+      <div>
+        <label>👥 Danh sách học sinh Excel .xlsx</label>
+        <input name="students_sheet" type="file" accept=".xlsx">
+        <p style="margin:4px 0 0;font-size:12px;color:var(--muted);">Không bắt buộc — cột A: STT, cột B: họ tên/tên đăng nhập, cột C: ngày sinh.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:flex;gap:12px;align-items:center;">
+      <button type="submit" style="padding:10px 24px;font-size:14px;">🚀 Xác nhận tạo &amp; Giao bộ từ vựng</button>
+    </div>
+  </form>
+</div>
+
+<div class="section-header">
+  <div>
+    <p class="section-title">📋 Danh sách các bộ từ vựng đã tạo</p>
+    <p class="section-sub">Tổng số ${vocabSets.length} bộ từ vựng trong hệ thống.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>STT</th><th>Tên bộ từ vựng</th><th>Ngôn ngữ</th><th>Cấp độ</th><th>Số từ</th><th>Học sinh</th><th>Ngày tạo</th><th>Thao tác</th></tr>
+      </thead>
+      <tbody>
+        ${vocabListRows || '<tr><td colspan="8" class="empty-state">Chưa có bộ từ vựng nào. Hãy điền biểu mẫu ở trên để tạo mới.</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+</div>`;
+  } else if (view === "legacy-progress-view") {
     content = `
 <div class="section-header">
   <div>
@@ -317,8 +620,9 @@ function filterCards(q) {
   </div>
 
   <form method="post" action="/admin/action" enctype="multipart/form-data">
-    ${hidden('action', 'test')}
-    ${hidden('view', 'exams')}
+    ${hidden("action", "test")}
+    ${hidden("view", "exams")}
+    ${hidden("submission_key", crypto.randomUUID())}
     
     <div class="form-grid" style="margin-bottom:12px;">
       <div>
@@ -401,17 +705,22 @@ function filterCards(q) {
       <thead>
         <tr><th>Kỳ thi / Môn</th><th>Bắt đầu</th><th>Kết thúc</th><th>Thời lượng</th><th>Số câu / Đề</th><th>Lượt làm</th><th>Thao tác</th></tr>
       </thead>
-      <tbody>${testRows(activeTests, 'exams')}</tbody>
+      <tbody>${testRows(activeTests, "exams")}</tbody>
     </table>
   </div>
 </div>
 `;
   }
 
-  const notices = `${message ? `<div class="notice">${esc(message)}</div>` : ''}${error ? `<div class="notice notice-error">${esc(error)}</div>` : ''}`;
-  const script = view === 'accounts' && selectedTestId && selectedTestId !== 'legacy-all-accounts'
-    ? `<script>(()=>{const picker=document.querySelector('#available-account-picker'),showPicker=document.querySelector('[data-show-account-picker]'),hidePicker=document.querySelector('[data-hide-account-picker]'),checks=()=>document.querySelectorAll('[data-available-student]');showPicker?.addEventListener('click',()=>{picker.hidden=false;showPicker.hidden=true});hidePicker?.addEventListener('click',()=>{picker.hidden=true;showPicker.hidden=false});document.querySelectorAll('[data-select-all]').forEach(control=>control.addEventListener(control.type==='checkbox'?'change':'click',()=>{const checked=control.type==='checkbox'?control.checked:true;checks().forEach(input=>{input.checked=checked});document.querySelectorAll('[data-select-all]').forEach(item=>{if(item.type==='checkbox')item.checked=checked})}));const table=document.querySelector('#subject-progress');if(!table)return;const refresh=async()=>{if(document.hidden)return;try{const response=await fetch('/admin/progress',{method:'POST',headers:{'Accept':'application/json'}});if(!response.ok)return;const data=await response.json();const rows=new Map(data.rows.filter(row=>row.test_id===${JSON.stringify(selectedTestId)}).map(row=>[row.username,row]));table.querySelectorAll('tbody tr[data-student]').forEach(tr=>{const row=rows.get(tr.dataset.student);if(!row)return;tr.querySelector('[data-field="status"]').textContent=row.status;tr.querySelector('[data-field="attempts"]').textContent=row.attempt_count+' / '+(row.max_attempts===0?'∞':row.max_attempts);tr.querySelector('[data-field="score"]').textContent=row.score;tr.querySelector('[data-field="violations"]').textContent=row.violations||0;});}catch(_){}};refresh();setInterval(refresh,3000);})()</script>`
-    : view === 'legacy-progress-view' ? `<script>const hidden=(form,name,value)=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=String(value);form.append(input)};const remove=(testId,username)=>{const form=document.createElement('form');form.method='post';form.action='/admin/action';form.className='inline-form';form.onsubmit=()=>confirm('Bạn có chắc muốn xóa tiến độ này?');hidden(form,'action','attempt_delete');hidden(form,'test_id',testId);hidden(form,'username',username);hidden(form,'view','${esc(view)}');const button=document.createElement('button');button.className='delete-btn';button.textContent='Xóa tiến độ';form.append(button);return form};setInterval(async()=>{try{const data=await(await fetch('/admin/progress',{method:'POST'})).json(),body=document.querySelector('#progress tbody');if(body){body.replaceChildren(...data.rows.map(row=>{const tr=document.createElement('tr');[row.test,row.name,row.status,row.attempt_count+' / '+(row.max_attempts===0?'∞':row.max_attempts),row.score,row.violations].forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.append(td)});const action=document.createElement('td');if(row.attempt_count)action.append(remove(row.test_id,row.username));tr.append(action);return tr}))}}catch(error){}},5000)</script>` : '';
+  const notices = `${message ? `<div class="notice">${esc(message)}</div>` : ""}${error ? `<div class="notice notice-error">${esc(error)}</div>` : ""}`;
+  const script =
+    view === "accounts" &&
+    (selectedTestId || selectedVocabId) &&
+    selectedTestId !== "legacy-all-accounts"
+      ? `<script>(()=>{const picker=document.querySelector('#available-account-picker'),showPicker=document.querySelector('[data-show-account-picker]'),hidePicker=document.querySelector('[data-hide-account-picker]'),checks=()=>document.querySelectorAll('[data-available-student]');showPicker?.addEventListener('click',()=>{picker.hidden=false;showPicker.hidden=true});hidePicker?.addEventListener('click',()=>{picker.hidden=true;showPicker.hidden=false});document.querySelectorAll('[data-select-all]').forEach(control=>control.addEventListener(control.type==='checkbox'?'change':'click',()=>{const checked=control.type==='checkbox'?control.checked:true;checks().forEach(input=>{input.checked=checked});document.querySelectorAll('[data-select-all]').forEach(item=>{if(item.type==='checkbox')item.checked=checked})}));const table=document.querySelector('#subject-progress');if(!table)return;const refresh=async()=>{if(document.hidden)return;try{const response=await fetch('/admin/progress',{method:'POST',headers:{'Accept':'application/json'}});if(!response.ok)return;const data=await response.json();const rows=new Map(data.rows.filter(row=>row.test_id===${JSON.stringify(selectedTestId)}).map(row=>[row.username,row]));table.querySelectorAll('tbody tr[data-student]').forEach(tr=>{const row=rows.get(tr.dataset.student);if(!row)return;tr.querySelector('[data-field="status"]').textContent=row.status;tr.querySelector('[data-field="attempts"]').textContent=row.attempt_count+' / '+(row.max_attempts===0?'∞':row.max_attempts);tr.querySelector('[data-field="score"]').textContent=row.score;tr.querySelector('[data-field="violations"]').textContent=row.violations||0;});}catch(_){}};refresh();setInterval(refresh,3000);})()</script>`
+      : view === "legacy-progress-view"
+        ? `<script>const hidden=(form,name,value)=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=String(value);form.append(input)};const remove=(testId,username)=>{const form=document.createElement('form');form.method='post';form.action='/admin/action';form.className='inline-form';form.onsubmit=()=>confirm('Bạn có chắc muốn xóa tiến độ này?');hidden(form,'action','attempt_delete');hidden(form,'test_id',testId);hidden(form,'username',username);hidden(form,'view','${esc(view)}');const button=document.createElement('button');button.className='delete-btn';button.textContent='Xóa tiến độ';form.append(button);return form};setInterval(async()=>{try{const data=await(await fetch('/admin/progress',{method:'POST'})).json(),body=document.querySelector('#progress tbody');if(body){body.replaceChildren(...data.rows.map(row=>{const tr=document.createElement('tr');[row.test,row.name,row.status,row.attempt_count+' / '+(row.max_attempts===0?'∞':row.max_attempts),row.score,row.violations].forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.append(td)});const action=document.createElement('td');if(row.attempt_count)action.append(remove(row.test_id,row.username));tr.append(action);return tr}))}}catch(error){}},5000)</script>`
+        : "";
 
   const bodyHtml = `
 <div class="page-title-row">
@@ -424,7 +733,7 @@ ${tabNav}
 ${content}
 ${script}`;
 
-  return page('Quản trị hệ thống', name, bodyHtml);
+  return page("Quản trị hệ thống", name, bodyHtml);
 }
 
 module.exports = { esc, loginPage, page, renderAdmin };
