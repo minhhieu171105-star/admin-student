@@ -1000,6 +1000,7 @@ article p { margin: 6px 0 0; font-size: 14px; }
   .logout-text { display: inline; }
   .admin-layout { grid-template-columns: 1fr; }
   .form-row, .grid, .summary-grid { grid-template-columns: 1fr; }
+  input[type="date"], input[type="datetime-local"], input[type="time"] { width: 100%; min-width: 0; max-width: 100%; font-size: 16px; }
   .detail-grid { grid-template-columns: 1fr; }
   .card { padding: 14px; }
   .login-card { padding: 24px; }
