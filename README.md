@@ -11,7 +11,6 @@
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Cloudinary cấu hình bằng `CLOUDINARY_URL` hoặc điền đủ `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Cloudinary lưu file đề `.xlsx`; câu hỏi, lịch thi, tài khoản và kết quả được lưu MongoDB. Atlas cần cấp quyền đọc/ghi cho user và cho phép IP máy chạy app trong Network Access.
 
 ## Chạy
 
@@ -35,7 +34,6 @@ Có thể đặt lịch mở/đóng, thời lượng, số câu mỗi học sinh
 ## Cấu trúc
 
 - `server.js`: nạp `.env`, kết nối MongoDB và khởi động máy chủ.
-- `config/`: cấu hình MongoDB và Cloudinary.
 - `controllers/adminDashboardView.js`: dựng giao diện quản trị.
 - `middleware/authMiddleware.js`: bảo vệ trang quản trị.
 - `routes/adminRoutes.js`: route và nghiệp vụ quản trị.

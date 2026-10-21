@@ -1,19 +1,24 @@
 const { MongoClient } = require('mongodb');
+
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error('MONGODB_URI is missing from Admin/.env');
+
 const client = new MongoClient(uri);
 const databaseName = process.env.MONGODB_DATABASE || 'thi_truc_tuyen';
 const db = () => client.db(databaseName);
+
 async function initializeDatabase() {
-  await db().collection('students').createIndex({ username: 1 }, { unique: true });
-  await db().collection('tests').createIndex({ student_usernames: 1, starts_at: -1 });
-  await db().collection('attempts').updateMany({ attempt_no: { $exists: false } }, { $set: { attempt_no: 1 } });
-  try { await db().collection('attempts').dropIndex('test_id_1_student_username_1'); } catch (_) {}
-  await db().collection('attempts').createIndex({ test_id: 1, student_username: 1, attempt_no: 1 }, { unique: true });
-  await db().collection('vocab_sets').createIndex({ created_at: -1 });
-  await db().collection('vocab_sets').createIndex({ student_usernames: 1 });
-  await db().collection('vocab_creation_locks').createIndex({ created_at: 1 }, { expireAfterSeconds: 86400 });
-  await db().collection('test_creation_locks').createIndex({ created_at: 1 }, { expireAfterSeconds: 86400 });
+  await db().collection('hoc_sinh').createIndex({ ten_dang_nhap: 1 }, { unique: true });
+  await db().collection('ky_thi').createIndex({ danh_sach_hoc_sinh: 1, bat_dau_luc: -1 });
+  await db().collection('bai_lam').updateMany({ lan_lam: { $exists: false } }, { $set: { lan_lam: 1 } });
+  await db().collection('bai_lam').createIndex(
+    { ma_ky_thi: 1, ten_dang_nhap_hoc_sinh: 1, lan_lam: 1 },
+    { unique: true }
+  );
+  await db().collection('bo_tu_vung').createIndex({ tao_luc: -1 });
+  await db().collection('bo_tu_vung').createIndex({ danh_sach_hoc_sinh: 1 });
+  await db().collection('khoa_tao_tu_vung').createIndex({ tao_luc: 1 }, { expireAfterSeconds: 86400 });
+  await db().collection('khoa_tao_ky_thi').createIndex({ tao_luc: 1 }, { expireAfterSeconds: 86400 });
 }
 
 module.exports = { client, db, databaseName, uri, initializeDatabase };

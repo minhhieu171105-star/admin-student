@@ -9,19 +9,19 @@ const client = new MongoClient(uri);
   try {
     await client.connect();
     const db = client.db(process.env.MONGODB_DATABASE || 'thi_truc_tuyen');
-    await db.collection('students').createIndex({ username: 1 }, { unique: true });
-    await db.collection('students').createIndex({ birth_date: 1, deleted_at: 1 });
-    await db.collection('admins').createIndex({ username: 1 }, { unique: true });
-    await db.collection('tests').createIndex({ student_usernames: 1, starts_at: -1 });
-    await db.collection('attempts').updateMany({ attempt_no: { $exists: false } }, { $set: { attempt_no: 1 } });
-    try { await db.collection('attempts').dropIndex('test_id_1_student_username_1'); } catch (_) {}
-    await db.collection('attempts').createIndex({ test_id: 1, student_username: 1, attempt_no: 1 }, { unique: true });
-    const username = process.env.ADMIN_USERNAME, password = process.env.ADMIN_PASSWORD;
-    if (!username || !password) throw new Error('Set ADMIN_USERNAME and ADMIN_PASSWORD in Admin/.env before setup.');
-    const admin = await db.collection('admins').findOne({ username });
-    const fields = { username, full_name: process.env.ADMIN_NAME || 'Quan tri vien', password_hash: await bcrypt.hash(password, 12) };
-    if (admin) await db.collection('admins').updateOne({ _id: admin._id }, { $set: fields });
-    else await db.collection('admins').insertOne({ ...fields, created_at: Math.floor(Date.now()/1000) });
+    await db.collection('hoc_sinh').createIndex({ ten_dang_nhap: 1 }, { unique: true });
+    await db.collection('hoc_sinh').createIndex({ ngay_sinh: 1, xoa_luc: 1 });
+    await db.collection('quan_tri_vien').createIndex({ ten_dang_nhap: 1 }, { unique: true });
+    await db.collection('ky_thi').createIndex({ danh_sach_hoc_sinh: 1, bat_dau_luc: -1 });
+    await db.collection('bai_lam').updateMany({ lan_lam: { $exists: false } }, { $set: { lan_lam: 1 } });
+    try { await db.collection('bai_lam').dropIndex('ma_ky_thi_1_ten_dang_nhap_hoc_sinh_1'); } catch (_) {}
+    await db.collection('bai_lam').createIndex({ ma_ky_thi: 1, ten_dang_nhap_hoc_sinh: 1, lan_lam: 1 }, { unique: true });
+    const ten_dang_nhap = process.env.ADMIN_USERNAME, password = process.env.ADMIN_PASSWORD;
+    if (!ten_dang_nhap || !password) throw new Error('Set ADMIN_USERNAME and ADMIN_PASSWORD in Admin/.env before setup.');
+    const admin = await db.collection('quan_tri_vien').findOne({ ten_dang_nhap });
+    const fields = { ten_dang_nhap, ho_ten: process.env.ADMIN_NAME || 'Quan tri vien', mat_khau_ma_hoa: await bcrypt.hash(password, 12) };
+    if (admin) await db.collection('quan_tri_vien').updateOne({ _id: admin._id }, { $set: fields });
+    else await db.collection('quan_tri_vien').insertOne({ ...fields, tao_luc: Math.floor(Date.now()/1000) });
     console.log('MongoDB indexes ready. Existing account and exam documents were preserved.');
   } finally { await client.close(); }
 })().catch(e => { console.error(e.message); process.exit(1); });
