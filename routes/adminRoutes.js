@@ -359,12 +359,6 @@ app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
       if (!Number.isInteger(max) || max < 0) return go('Số lượt làm phải là số nguyên từ 0 trở lên; 0 là không giới hạn.', true, 'exams');
       if (!questionFile) return go('Hãy chọn tệp đề thi Excel .xlsx.', true, 'exams');
       if (!submissionKey) return go('Phiên giao đề đã hết hạn. Hãy tải lại trang và thử lại.', true, 'exams');
-      try {
-        await c.collection('test_creation_locks').insertOne({ _id: submissionKey, created_at: new Date() });
-      } catch (error) {
-        if (error?.code === 11000) return go('Yêu cầu giao đề này đang được xử lý. Hệ thống chỉ tạo một kỳ thi.', false, 'exams');
-        throw error;
-      }
       const questions = parseQuestionRows(await readExamRows(questionFile.buffer));
       if (!questions.length || qps > questions.length) return go(`File đề có ${questions.length} câu hợp lệ. Số câu mỗi học sinh (${qps}) không được vượt quá số câu trong đề.`, true, 'exams');
       const usernames = [];
@@ -379,23 +373,35 @@ app.post('/admin/action', requireAdmin, uploads, async (req, res, next) => {
       }
       const assignedUsernames = [...new Set(usernames)];
       if (studentsFile && !assignedUsernames.length) return go('File danh sách học sinh chưa có dòng hợp lệ. Cột A là STT, cột B là họ tên/tên đăng nhập, cột C là ngày sinh.', true, 'exams');
-      const uploaded = await new Promise((resolve, reject) => { const stream = cloudinary.uploader.upload_stream({ resource_type: 'raw', folder: 'online-exams', format: 'xlsx', public_id: `${Date.now()}-${path.basename(questionFile.originalname, path.extname(questionFile.originalname))}` }, (err, result) => err ? reject(err) : resolve(result)); stream.end(questionFile.buffer); });
-      await c.collection('tests').insertOne({
-        title: b.title.trim(),
-        subject: String(b.subject || b.title).trim(),
-        questions,
-        total_questions: questions.length,
-        file: { url: uploaded.secure_url, public_id: uploaded.public_id },
-        student_usernames: assignedUsernames,
-        questions_per_student: qps,
-        max_attempts: max,
-        shuffle_questions: b.shuffle_questions === '1',
-        starts_at: starts,
-        ends_at: ends,
-        no_deadline: noDeadline,
-        duration_minutes: duration,
-        created_at: Math.floor(Date.now()/1000)
-      });
+      try {
+        await c.collection('test_creation_locks').insertOne({ _id: submissionKey, created_at: new Date() });
+      } catch (error) {
+        if (error?.code === 11000) return go('Yêu cầu giao đề này đang được xử lý. Hãy chờ vài giây rồi kiểm tra danh sách kỳ thi.', false, 'exams');
+        throw error;
+      }
+      try {
+        const uploaded = await new Promise((resolve, reject) => { const stream = cloudinary.uploader.upload_stream({ resource_type: 'raw', folder: 'online-exams', format: 'xlsx', public_id: `${Date.now()}-${path.basename(questionFile.originalname, path.extname(questionFile.originalname))}` }, (err, result) => err ? reject(err) : resolve(result)); stream.end(questionFile.buffer); });
+        await c.collection('tests').insertOne({
+          title: b.title.trim(),
+          subject: String(b.subject || b.title).trim(),
+          questions,
+          total_questions: questions.length,
+          file: { url: uploaded.secure_url, public_id: uploaded.public_id },
+          student_usernames: assignedUsernames,
+          questions_per_student: qps,
+          max_attempts: max,
+          shuffle_questions: b.shuffle_questions === '1',
+          starts_at: starts,
+          ends_at: ends,
+          no_deadline: noDeadline,
+          duration_minutes: duration,
+          created_at: Math.floor(Date.now()/1000)
+        });
+      } catch (error) {
+        // Không để lỗi đọc/tải file khóa vĩnh viễn lần giao đề kế tiếp.
+        await c.collection('test_creation_locks').deleteOne({ _id: submissionKey }).catch(() => {});
+        throw error;
+      }
       return go(assignedUsernames.length
         ? `Đã tạo đề với ${questions.length} câu và gán cho ${assignedUsernames.length} học sinh.`
         : `Đã tạo đề với ${questions.length} câu. Bạn có thể thêm học sinh vào môn sau.`, false, 'exams');
