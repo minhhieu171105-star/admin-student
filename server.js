@@ -20,7 +20,11 @@ async function start() {
   });
 }
 
-start().catch(error => {
-  console.error('Admin server startup failed:', error.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch(error => {
+    console.error('Admin server startup failed:', error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
