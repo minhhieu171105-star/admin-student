@@ -4,4 +4,9 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { app } = require('../routes/adminRoutes');
 
-module.exports = app;
+function handler(req, res) {
+  return app(req, res);
+}
+
+module.exports = handler;
+module.exports.default = handler;
